@@ -57,7 +57,7 @@ export function withAuth(handler: (req: AuthenticatedRequest) => Promise<NextRes
 export function withRateLimit(limit: number = 100, windowMs: number = 60000) {
   return (handler: (req: NextRequest) => Promise<NextResponse>) => {
     return async (req: NextRequest) => {
-      const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown';
+      const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
 
       if (!checkRateLimit(ip, limit, windowMs)) {
         return NextResponse.json(

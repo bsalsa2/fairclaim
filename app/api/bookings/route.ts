@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { flightId, passengers, originalPrice } = body;
+    const { flightId, passengers, originalPrice, cabin = 'economy' } = body;
 
     if (!flightId || !passengers || !originalPrice) {
       return NextResponse.json(
@@ -63,7 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = createBooking(userId, flightId, passengers, originalPrice);
+    const validCabins = ['economy', 'premium', 'business', 'first'];
+    if (!validCabins.includes(cabin)) {
+      return NextResponse.json(
+        { error: 'Invalid cabin class' },
+        { status: 400 }
+      );
+    }
+
+    const booking = createBooking(userId, flightId, passengers, originalPrice, cabin);
 
     return NextResponse.json(
       {

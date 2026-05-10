@@ -60,6 +60,7 @@ export interface Booking {
   basePrice: number;
   totalSavings: number;
   passengers: number;
+  cabin: 'economy' | 'premium' | 'business' | 'first';
   bookingReference: string;
   status: 'active' | 'completed' | 'cancelled';
   createdAt: Date;
@@ -137,7 +138,8 @@ export function createBooking(
   userId: string,
   flightId: string,
   passengers: number,
-  originalPrice: number
+  originalPrice: number,
+  cabin: 'economy' | 'premium' | 'business' | 'first' = 'economy'
 ): Booking {
   const booking: Booking = {
     id: generateId('bkg'),
@@ -148,6 +150,7 @@ export function createBooking(
     basePrice: originalPrice * 0.8,
     totalSavings: 0,
     passengers,
+    cabin,
     bookingReference: generateBookingReference(),
     status: 'active',
     createdAt: new Date(),

@@ -1,3 +1,5 @@
+'use client';
+
 import DashboardSidebar from '@/app/components/DashboardSidebar';
 
 export default function AccountPage() {

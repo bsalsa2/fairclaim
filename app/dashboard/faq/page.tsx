@@ -1,3 +1,5 @@
+'use client';
+
 import DashboardSidebar from '@/app/components/DashboardSidebar';
 import { ChevronDown } from 'lucide-react';
 

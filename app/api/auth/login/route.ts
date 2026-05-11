@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail } from '@/lib/db';
+import { getUserByEmail, verifyPassword, initializeAdvancedDemo } from '@/lib/advanced-db';
+
+// Initialize demo data on first request
+let initialized = false;
+if (!initialized) {
+  initializeAdvancedDemo();
+  initialized = true;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,27 +14,29 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { success: false, error: 'Email and password are required' },
         { status: 400 }
       );
     }
 
     const user = getUserByEmail(email);
 
-    if (!user || user.password !== password) {
+    if (!user || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // In production, create a JWT token
     const response = NextResponse.json({
+      success: true,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        createdAt: user.createdAt,
       },
+      message: 'Login successful',
     });
 
     response.cookies.set('userId', user.id, {
@@ -35,12 +44,14 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
     });
 
     return response;
   } catch (error) {
+    console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

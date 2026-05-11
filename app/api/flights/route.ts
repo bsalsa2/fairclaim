@@ -1,48 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getUserBookedFlights,
-  getUserTrackedFlights,
-  calculateUserStats,
-  initializeDemoData,
-} from '@/lib/db';
+  getUserBookings,
+  getUserStats,
+  initializeAdvancedDemo,
+  getUserById,
+} from '@/lib/advanced-db';
 
 // Initialize demo data on first request
-initializeDemoData();
+let initialized = false;
+if (!initialized) {
+  initializeAdvancedDemo();
+  initialized = true;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.cookies.get('userId')?.value || 'user-1'; // Demo: use default user
+    const userId = request.cookies.get('userId')?.value || 'usr-demo';
 
-    const bookedFlights = getUserBookedFlights(userId);
-    const trackedFlights = getUserTrackedFlights(userId);
-    const stats = calculateUserStats(userId);
+    const user = getUserById(userId);
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const bookings = getUserBookings(userId, 'active');
+    const stats = getUserStats(userId);
+
+    if (!stats) {
+      return NextResponse.json({ error: 'User stats not found' }, { status: 404 });
+    }
 
     return NextResponse.json({
-      stats,
-      booked: bookedFlights.map((f) => ({
-        id: f.id,
-        flightDate: f.flightDate.toISOString(),
-        route: f.route,
-        airline: f.airline,
-        originalPrice: f.originalPrice,
-        currentPrice: f.currentPrice,
-        savings: f.savings,
-        status: f.status,
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
+      },
+      stats: {
+        fareDips: stats.fareDips,
+        totalSavings: Math.round(stats.totalSavings * 100) / 100,
+        trackedFlights: stats.trackedFlights,
+        nextFlightDate: stats.nextFlightDate,
+      },
+      booked: bookings.map((b) => ({
+        id: b.id,
+        bookingReference: b.bookingReference,
+        originalPrice: b.originalPrice,
+        currentPrice: b.currentPrice,
+        savings: Math.round(b.totalSavings * 100) / 100,
+        passengers: b.passengers,
+        cabin: b.cabin,
+        status: b.status,
+        createdAt: b.createdAt.toISOString(),
+        priceHistory: b.priceHistory.slice(-5),
       })),
-      tracked: trackedFlights.map((f) => ({
-        id: f.id,
-        flightDate: f.flightDate.toISOString(),
-        route: f.route,
-        airline: f.airline,
-        originalPrice: f.originalPrice,
-        currentPrice: f.currentPrice,
-        latestPriceDrop: f.priceDrops[f.priceDrops.length - 1]?.price || f.originalPrice,
-      })),
+      message: 'Flights data fetched successfully',
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error fetching flights:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch flights' },
+      { success: false, error: 'Failed to fetch flights' },
       { status: 500 }
     );
   }

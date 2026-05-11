@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import DashboardSidebar from '@/app/components/DashboardSidebar';
 import { ChevronDown } from 'lucide-react';
 
@@ -29,6 +32,25 @@ const faqs = [
   },
 ];
 
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between cursor-pointer font-bold text-gray-900 hover:text-primary-600 transition-colors"
+      >
+        {question}
+        <ChevronDown
+          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOpen && <p className="mt-4 text-gray-600">{answer}</p>}
+    </div>
+  );
+}
+
 export default function FAQPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -38,13 +60,7 @@ export default function FAQPage() {
 
         <div className="space-y-4 max-w-3xl">
           {faqs.map((faq, idx) => (
-            <details key={idx} className="bg-white rounded-lg border border-gray-200 p-6">
-              <summary className="flex items-center justify-between cursor-pointer font-bold text-gray-900">
-                {faq.question}
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              </summary>
-              <p className="mt-4 text-gray-600">{faq.answer}</p>
-            </details>
+            <FAQItem key={idx} question={faq.question} answer={faq.answer} />
           ))}
         </div>
       </main>

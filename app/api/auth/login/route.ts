@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail, verifyPassword, initializeAdvancedDemo } from '@/lib/advanced-db';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
-// Initialize demo data on first request
-let initialized = false;
-if (!initialized) {
-  initializeAdvancedDemo();
-  initialized = true;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return hashPassword(password) === hash;
 }
 
 export async function POST(request: NextRequest) {
@@ -19,9 +26,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = getUserByEmail(email);
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (error || !users) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+
+    if (!verifyPassword(password, users.password_hash)) {
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
@@ -31,23 +49,31 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        createdAt: user.createdAt,
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        createdAt: users.created_at,
       },
       message: 'Login successful',
     });
 
-    response.cookies.set('userId', user.id, {
+    response.cookies.set('userId', users.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
 
     return response;
+  } catch (error) {
+    console.error('Login error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

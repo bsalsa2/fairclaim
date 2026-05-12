@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id    String     @id @default(cuid())
+  email String     @unique
+  passwordHash String
+  name  String?
+  avatar String?
+
+  preferences PreferencesSettings?
+  stats       UserStats?
+  bookings    Booking[]
+  priceAlerts PriceAlert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PreferencesSettings {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  autoRefaring    Boolean @default(true)
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(false)
+
+  updatedAt       DateTime @updatedAt
+}
+
+model UserStats {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalSavings    Float   @default(0)
+  fareDips        Int     @default(0)
+  flightsTracked  Int     @default(0)
+  successfulRefares Int  @default(0)
+
+  updatedAt       DateTime @updatedAt
+}
+
+model Flight {
+  id              String    @id @default(cuid())
+
+  airline         String
+  airlineCode     String
+  flightNumber    String
+
+  departureAirport String
+  arrivalAirport  String
+  departureTime   DateTime
+  arrivalTime     DateTime
+
+  duration        Int
+  stops           Int      @default(0)
+  status          String   @default("active")
+  cabin           String   @default("economy")
+
+  bookings        Booking[]
+  prices          FlightPrice[]
+  priceAlerts     PriceAlert[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([departureAirport, arrivalAirport])
+  @@index([departureTime])
+}
+
+model Booking {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  flightId            String
+  flight              Flight    @relation(fields: [flightId], references: [id], onDelete: Cascade)
+
+  bookingReference    String    @unique
+  passengerName       String
+  passengers          Int       @default(1)
+  cabin               String    @default("economy")
+
+  originalPrice       Float
+  currentPrice        Float
+  basePrice           Float?
+  totalSavings        Float     @default(0)
+
+  status              String    @default("active")
+  refundStatus        String    @default("none")
+
+  emailNotifications  Boolean   @default(true)
+  airlineContacted    String[]  @default([])
+
+  priceHistory        FlightPrice[]
+  priceAlerts         PriceAlert[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([flightId])
+  @@index([status])
+}
+
+model FlightPrice {
+  id          String    @id @default(cuid())
+
+  flightId    String
+  flight      Flight    @relation(fields: [flightId], references: [id], onDelete: Cascade)
+
+  bookingId   String?
+  booking     Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  price       Float
+  baseFare    Float?
+  taxes       Float?
+  fees        Float?
+
+  source      String    @default("manual")
+  timestamp   DateTime  @default(now())
+
+  @@index([flightId])
+  @@index([bookingId])
+  @@index([timestamp])
+}
+
+model PriceAlert {
+  id          String    @id @default(cuid())
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bookingId   String
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  flightId    String
+  flight      Flight    @relation(fields: [flightId], references: [id])
+
+  targetPrice Float
+  triggered   Boolean   @default(false)
+  triggeredAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([bookingId, flightId])
+  @@index([userId])
+  @@index([triggered])
+}

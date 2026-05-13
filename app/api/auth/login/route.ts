@@ -15,6 +15,7 @@ function verifyPassword(password: string, hash: string): boolean {
   return hashPassword(password) === hash;
 }
 
+// User login endpoint
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();

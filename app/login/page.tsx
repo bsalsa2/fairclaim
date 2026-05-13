@@ -6,6 +6,7 @@ import { Plane, Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  // Force refresh - email/password authentication
   const [tab, setTab] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('demo@example.com');
   const [password, setPassword] = useState('password123');

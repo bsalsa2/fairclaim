@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 export async function getAuthenticatedUser(request: NextRequest) {
   const supabase = createClient(
@@ -17,14 +17,14 @@ export async function getAuthenticatedUser(request: NextRequest) {
 }
 
 export async function getOrCreateUser(
-  supabase: any,
+  supabase: SupabaseClient<any, any, any, any, any>,
   authUser: any
 ) {
   if (!authUser?.id || !authUser?.email) {
     return null;
   }
 
-  const { data: existingUser } = await supabase
+  const { data: existingUser } = await (supabase as any)
     .from('users')
     .select('*')
     .eq('id', authUser.id)
@@ -34,7 +34,7 @@ export async function getOrCreateUser(
     return existingUser;
   }
 
-  const { data: newUser, error } = await supabase
+  const { data: newUser, error } = await (supabase as any)
     .from('users')
     .insert([
       {

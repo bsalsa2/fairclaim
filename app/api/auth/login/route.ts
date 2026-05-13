@@ -15,6 +15,7 @@ function verifyPassword(password: string, hash: string): boolean {
   return hashPassword(password) === hash;
 }
 
+// User login endpoint
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
@@ -66,14 +67,6 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error) {
-    console.error('Login error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

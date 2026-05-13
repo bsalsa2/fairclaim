@@ -17,7 +17,7 @@ export async function getAuthenticatedUser(request: NextRequest) {
 }
 
 export async function getOrCreateUser(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   authUser: any
 ) {
   if (!authUser?.id || !authUser?.email) {

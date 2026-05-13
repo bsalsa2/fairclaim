@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/login?error=exchange_failed', request.url));
     }
 
-    const user = await getOrCreateUser(supabase, data.user);
+    const user = await getOrCreateUser(supabase as any, data.user);
     if (!user) {
       return NextResponse.redirect(new URL('/login?error=user_creation_failed', request.url));
     }

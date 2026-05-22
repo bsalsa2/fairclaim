@@ -16,6 +16,14 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .pulse-dot { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .slide-in-left { animation: slideInLeft 0.3s ease-out; }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        .bounce { animation: bounce 0.6s ease-in-out; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .error-shake { animation: shake 0.3s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        button.loading { opacity: 0.7; pointer-events: none; }
+        .error-message { color: #dc2626; font-size: 0.875rem; margin-top: 0.5rem; display: none; }
     </style>
 </head>
 <body class="bg-white">
@@ -47,10 +55,14 @@
             <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome to FairClaim</h1>
             <p class="text-gray-600 mb-6">Get credited when flight prices drop. Instantly.</p>
 
+            <div id="authError" class="error-message mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"></div>
+
             <div class="space-y-4">
                 <input type="email" id="authEmail" placeholder="Email" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-                <input type="password" id="authPassword" placeholder="Password" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-                <button onclick="handleAuth()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Sign In / Register</button>
+                <input type="password" id="authPassword" placeholder="Password (min 6 characters)" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <button id="authSubmitBtn" onclick="handleAuth()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                    <span id="authSubmitText">Sign In / Register</span>
+                </button>
             </div>
 
             <div class="flex items-center gap-4 my-6">
@@ -70,7 +82,7 @@
             </button>
 
             <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <p class="text-sm text-blue-900"><strong>Demo Account:</strong> Use any email/password to test</p>
+                <p class="text-sm text-blue-900">New user? Create an account with any email and password.</p>
             </div>
         </div>
     </div>
@@ -176,7 +188,9 @@
                 <h1 class="text-3xl font-bold text-gray-900 mb-2">Track a Flight</h1>
                 <p class="text-gray-600 mb-8">Forward your booking confirmation email & we'll monitor it</p>
 
-                <div class="space-y-6">
+                <div id="trackError" class="error-message mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"></div>
+
+                <form id="trackForm" onsubmit="trackFlight(event)" class="space-y-6">
                     <!-- Booking Confirmation -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Booking Confirmation Email</label>
@@ -186,23 +200,24 @@
                     <!-- Flight Details Form -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">From Airport</label>
-                            <input type="text" id="fromAirport" placeholder="e.g., LAX, JFK" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" maxlength="3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">From Airport <span class="text-red-600">*</span></label>
+                            <input type="text" id="fromAirport" placeholder="e.g., LAX, JFK" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="3" required>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">To Airport</label>
-                            <input type="text" id="toAirport" placeholder="e.g., ORD, MIA" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" maxlength="3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">To Airport <span class="text-red-600">*</span></label>
+                            <input type="text" id="toAirport" placeholder="e.g., ORD, MIA" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="3" required>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Departure Date</label>
-                            <input type="date" id="departDate" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Departure Date <span class="text-red-600">*</span></label>
+                            <input type="date" id="departDate" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" required>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Airline</label>
-                            <select id="airline" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Airline <span class="text-red-600">*</span></label>
+                            <select id="airline" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" required>
+                                <option value="">Select an airline</option>
                                 <option>American Airlines</option>
                                 <option>United Airlines</option>
                                 <option>Delta Air Lines</option>
@@ -212,20 +227,20 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ticket Price</label>
-                            <input type="number" id="ticketPrice" placeholder="$" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" step="0.01">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ticket Price <span class="text-red-600">*</span></label>
+                            <input type="number" id="ticketPrice" placeholder="$" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" step="0.01" min="0.01" required>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Confirmation Number</label>
-                        <input type="text" id="confirmNumber" placeholder="e.g., ABC123" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" maxlength="6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Confirmation Number (Optional)</label>
+                        <input type="text" id="confirmNumber" placeholder="e.g., ABC123" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="6">
                     </div>
 
-                    <button onclick="trackFlight()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
-                        Start Tracking
+                    <button type="submit" id="trackSubmitBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                        <span id="trackSubmitText">🚀 Start Tracking Flight</span>
                     </button>
-                </div>
+                </form>
             </div>
 
             <!-- Real Flight Examples -->
@@ -292,14 +307,34 @@
         }
 
         // Email/Password Auth
-        function handleAuth() {
-            const email = document.getElementById('authEmail').value;
+        function handleAuth(e) {
+            if (e) e.preventDefault();
+            const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
+            const errorEl = document.getElementById('authError');
+            const submitBtn = document.getElementById('authSubmitBtn');
 
+            // Clear previous errors
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            // Validation
             if (!email || !password) {
-                alert('Please enter email and password');
+                showAuthError('Please fill in all fields');
                 return;
             }
+            if (password.length < 6) {
+                showAuthError('Password must be at least 6 characters');
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showAuthError('Please enter a valid email address');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            document.getElementById('authSubmitText').textContent = '⏳ Loading...';
 
             auth.createUserWithEmailAndPassword(email, password)
                 .then(userCredential => {
@@ -311,11 +346,14 @@
                     };
                     isNewUser = true;
                     localStorage.setItem('fairclaim_user', JSON.stringify(currentUser));
-                    console.log('New user created: ' + currentUser.email);
+                    console.log('✅ New user created: ' + currentUser.email);
 
                     // Clear form
                     document.getElementById('authEmail').value = '';
                     document.getElementById('authPassword').value = '';
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                    document.getElementById('authSubmitText').textContent = 'Sign In / Register';
 
                     showSection('profile');
                 })
@@ -330,10 +368,16 @@
                                     displayName: userCredential.user.displayName
                                 };
                                 localStorage.setItem('fairclaim_user', JSON.stringify(currentUser));
-                                console.log('User signed in: ' + currentUser.email);
+                                console.log('✅ User signed in: ' + currentUser.email);
 
-                                // Check if user has profile data
                                 database.ref('users/' + currentUser.id + '/profile').once('value', snapshot => {
+                                    // Clear form
+                                    document.getElementById('authEmail').value = '';
+                                    document.getElementById('authPassword').value = '';
+                                    submitBtn.disabled = false;
+                                    submitBtn.classList.remove('loading');
+                                    document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+
                                     if (!snapshot.exists()) {
                                         // Has account but no profile - show profile form
                                         isNewUser = true;
@@ -346,15 +390,39 @@
                                     }
                                 });
                             })
-                            .catch(err => alert('Sign in failed: ' + err.message));
+                            .catch(err => {
+                                submitBtn.disabled = false;
+                                submitBtn.classList.remove('loading');
+                                document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                                showAuthError('Invalid email or password');
+                                console.error('Sign in error:', err.message);
+                            });
                     } else if (error.code === 'auth/weak-password') {
-                        alert('Password is too weak. Use at least 6 characters.');
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError('Password must be at least 6 characters');
                     } else if (error.code === 'auth/invalid-email') {
-                        alert('Invalid email address.');
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError('Invalid email address');
                     } else {
-                        alert('Error: ' + error.message);
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError(error.message);
+                        console.error('Auth error:', error);
                     }
                 });
+        }
+
+        function showAuthError(message) {
+            const errorEl = document.getElementById('authError');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.style.display = 'block';
+            errorEl.parentElement.classList.add('error-shake');
+            setTimeout(() => errorEl.parentElement.classList.remove('error-shake'), 500);
         }
 
         // Google OAuth Auth
@@ -472,18 +540,61 @@
             document.getElementById('departDate').value = date.toISOString().split('T')[0];
         }
 
-        function trackFlight() {
-            const from = document.getElementById('fromAirport').value.toUpperCase();
-            const to = document.getElementById('toAirport').value.toUpperCase();
+        function trackFlight(e) {
+            if (e) e.preventDefault();
+
+            const from = document.getElementById('fromAirport').value.toUpperCase().trim();
+            const to = document.getElementById('toAirport').value.toUpperCase().trim();
             const price = parseFloat(document.getElementById('ticketPrice').value);
             const airline = document.getElementById('airline').value;
-            const confirmNumber = document.getElementById('confirmNumber').value || generateConfirmNumber();
+            const confirmNumber = (document.getElementById('confirmNumber').value || generateConfirmNumber()).toUpperCase();
             const departDate = document.getElementById('departDate').value;
+            const errorEl = document.getElementById('trackError');
+            const submitBtn = document.getElementById('trackSubmitBtn');
 
-            if (!from || !to || !price || !departDate) {
-                alert('Please fill in all required fields');
+            // Clear previous errors
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            // Comprehensive Validation
+            if (!from || !to || !price || !departDate || !airline) {
+                showTrackError('Please fill in all required fields');
                 return;
             }
+
+            if (from.length !== 3 || to.length !== 3) {
+                showTrackError('Airport codes must be 3 letters (e.g., LAX, JFK)');
+                return;
+            }
+
+            if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) {
+                showTrackError('Airport codes must contain only letters');
+                return;
+            }
+
+            if (from === to) {
+                showTrackError('Departure and arrival airports must be different');
+                return;
+            }
+
+            if (isNaN(price) || price <= 0) {
+                showTrackError('Price must be greater than $0');
+                return;
+            }
+
+            if (new Date(departDate) <= new Date()) {
+                showTrackError('Departure date must be in the future');
+                return;
+            }
+
+            if (!currentUser || !currentUser.id) {
+                showTrackError('Please sign in to track flights');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            document.getElementById('trackSubmitText').textContent = '⏳ Adding flight...';
 
             const flight = {
                 id: Date.now(),
@@ -494,35 +605,56 @@
                 airline,
                 confirmNumber,
                 departDate,
-                startedTracking: new Date().toLocaleDateString(),
+                startedTracking: new Date().toISOString(),
                 status: 'monitoring',
                 creditsEarned: 0,
                 pricesChecked: 0,
                 lowestPrice: price,
-                priceHistory: [{ date: new Date().toLocaleDateString(), price }]
+                priceHistory: [{ date: new Date().toISOString(), price }]
             };
 
             flights.push(flight);
 
-            // Save to both Firebase and localStorage
-            if (currentUser && currentUser.id) {
+            // Save to Firebase
+            if (currentUser && currentUser.id && database) {
                 database.ref('users/' + currentUser.id + '/flights/' + flight.id).set(flight)
-                    .catch(error => console.error('Error saving to Firebase:', error));
+                    .then(() => {
+                        console.log('✅ Flight saved to Firebase:', flight.id);
+                        localStorage.setItem(`flight_${flight.id}`, JSON.stringify(flight));
+                        simulatePriceDrop(flight);
+                        showNotification('✅ Flight tracking started! Price updates coming soon...');
+
+                        // Clear form
+                        document.getElementById('trackForm').reset();
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+
+                        updateDashboard();
+                        showSection('dashboard');
+                    })
+                    .catch(error => {
+                        console.error('❌ Error saving to Firebase:', error);
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+                        showTrackError('Error: ' + error.message);
+                    });
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+                showTrackError('Unable to save flight. Please try again.');
             }
-            localStorage.setItem(`flight_${flight.id}`, JSON.stringify(flight));
+        }
 
-            // Simulate price drop after 2-3 seconds
-            simulatePriceDrop(flight);
-
-            alert('✅ Flight tracking started! We\'ll monitor the price for you.');
-            document.getElementById('fromAirport').value = '';
-            document.getElementById('toAirport').value = '';
-            document.getElementById('ticketPrice').value = '';
-            document.getElementById('confirmNumber').value = '';
-            document.getElementById('departDate').value = '';
-
-            updateDashboard();
-            showSection('dashboard');
+        function showTrackError(message) {
+            const errorEl = document.getElementById('trackError');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.style.display = 'block';
+            errorEl.parentElement.classList.add('error-shake');
+            setTimeout(() => errorEl.parentElement.classList.remove('error-shake'), 500);
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         function simulatePriceDrop(flight) {

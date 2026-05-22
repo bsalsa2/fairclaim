@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FairClaim - Automatic Fare Drop Credits</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .gradient-blue { background: linear-gradient(135deg, #0066FF 0%, #0052CC 100%); }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .slide-in-left { animation: slideInLeft 0.3s ease-out; }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        .bounce { animation: bounce 0.6s ease-in-out; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .error-shake { animation: shake 0.3s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        button.loading { opacity: 0.7; pointer-events: none; }
+        .error-message { color: #dc2626; font-size: 0.875rem; margin-top: 0.5rem; display: none; }
+    </style>
+</head>
+<body class="bg-white">
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <div class="gradient-blue rounded-full p-2">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">FairClaim</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="showSection('dashboard')" class="text-gray-700 font-medium hover:text-blue-600 transition">Dashboard</button>
+                    <button onclick="showSection('track')" class="text-gray-700 font-medium hover:text-blue-600 transition">Track Flight</button>
+                    <button id="signoutBtn" onclick="signOut()" style="display:none;" class="px-4 py-2 text-gray-700 font-medium hover:text-red-600 transition">Sign Out</button>
+                    <button id="signinBtn" onclick="showSection('auth')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Sign In</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Auth Section -->
+    <div id="authSection" class="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center px-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome to FairClaim</h1>
+            <p class="text-gray-600 mb-6">Get credited when flight prices drop. Instantly.</p>
+
+            <div id="authError" class="error-message mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"></div>
+
+            <div class="space-y-4">
+                <input type="email" id="authEmail" placeholder="Email" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <input type="password" id="authPassword" placeholder="Password (min 6 characters)" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <button id="authSubmitBtn" onclick="handleAuth()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                    <span id="authSubmitText">Sign In / Register</span>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-4 my-6">
+                <div class="flex-1 border-t border-gray-200"></div>
+                <span class="text-gray-400 text-sm">or</span>
+                <div class="flex-1 border-t border-gray-200"></div>
+            </div>
+
+            <button onclick="handleGoogleAuth()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition">
+                <svg class="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign in with Google
+            </button>
+
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <p class="text-sm text-blue-900">New user? Create an account with any email and password.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Setup Section (shown only for new users) -->
+    <div id="profileSection" style="display:none;" class="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center px-4 py-8">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Complete Your Profile</h1>
+            <p class="text-gray-600 mb-6">We need a few details to file claims with airlines</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                    <input type="text" id="profileName" placeholder="John Doe" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                    <input type="tel" id="profilePhone" placeholder="(555) 123-4567" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Preferred Contact Method</label>
+                    <select id="profileContact" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        <option value="email">Email</option>
+                        <option value="phone">Phone</option>
+                    </select>
+                </div>
+
+                <div class="border-t pt-4">
+                    <p class="text-sm font-semibold text-gray-700 mb-4">Frequent Flyer Numbers (Optional)</p>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">American Airlines</label>
+                            <input type="text" id="ffAA" placeholder="AA#" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">United Airlines</label>
+                            <input type="text" id="ffUA" placeholder="UA#" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Delta Air Lines</label>
+                            <input type="text" id="ffDL" placeholder="DL#" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Southwest Airlines</label>
+                            <input type="text" id="ffSW" placeholder="SW#" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">JetBlue</label>
+                            <input type="text" id="ffJB" placeholder="JB#" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="completeProfile()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition mt-6">Continue to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboardSection" style="display:none;" class="min-h-screen bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p class="text-gray-600 text-sm mb-2">Total Bookings Tracked</p>
+                    <p class="text-3xl font-bold text-gray-900" id="totalBookings">0</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p class="text-gray-600 text-sm mb-2">Total Credits Earned</p>
+                    <p class="text-3xl font-bold text-green-600" id="totalCredits">$0</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p class="text-gray-600 text-sm mb-2">Price Drops Detected</p>
+                    <p class="text-3xl font-bold text-blue-600" id="priceDrops">0</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p class="text-gray-600 text-sm mb-2">Active Tracking</p>
+                    <p class="text-3xl font-bold text-orange-600" id="activeTracking">0</p>
+                </div>
+            </div>
+
+            <!-- Tracked Flights -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-2xl font-bold text-gray-900">Your Tracked Flights</h2>
+                </div>
+                <div id="flightsList" class="divide-y divide-gray-100">
+                    <div class="p-6 text-center text-gray-500">
+                        <p>No flights tracked yet. <button onclick="showSection('track')" class="text-blue-600 font-semibold">Add one now!</button></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Track Flight Section -->
+    <div id="trackSection" style="display:none;" class="min-h-screen bg-gray-50 py-12">
+        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-white rounded-2xl shadow-lg p-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Track a Flight</h1>
+                <p class="text-gray-600 mb-8">Forward your booking confirmation email & we'll monitor it</p>
+
+                <div id="trackError" class="error-message mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"></div>
+
+                <form id="trackForm" onsubmit="trackFlight(event)" class="space-y-6">
+                    <!-- Booking Confirmation -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Booking Confirmation Email</label>
+                        <textarea id="bookingEmail" placeholder="Paste your booking confirmation email here" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono text-sm" rows="6"></textarea>
+                    </div>
+
+                    <!-- Flight Details Form -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">From Airport <span class="text-red-600">*</span></label>
+                            <input type="text" id="fromAirport" placeholder="e.g., LAX, JFK" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="3" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">To Airport <span class="text-red-600">*</span></label>
+                            <input type="text" id="toAirport" placeholder="e.g., ORD, MIA" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="3" required>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Departure Date <span class="text-red-600">*</span></label>
+                            <input type="date" id="departDate" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Airline <span class="text-red-600">*</span></label>
+                            <select id="airline" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" required>
+                                <option value="">Select an airline</option>
+                                <option>American Airlines</option>
+                                <option>United Airlines</option>
+                                <option>Delta Air Lines</option>
+                                <option>Southwest Airlines</option>
+                                <option>JetBlue</option>
+                                <option>Alaska Airlines</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ticket Price <span class="text-red-600">*</span></label>
+                            <input type="number" id="ticketPrice" placeholder="$" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" step="0.01" min="0.01" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Confirmation Number (Optional)</label>
+                        <input type="text" id="confirmNumber" placeholder="e.g., ABC123" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase" maxlength="6">
+                    </div>
+
+                    <button type="submit" id="trackSubmitBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                        <span id="trackSubmitText">🚀 Start Tracking Flight</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Real Flight Examples -->
+            <div class="mt-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Popular Routes (Real Prices)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div onclick="loadExampleFlight('LAX', 'JFK', 450, 'American Airlines')" class="bg-white rounded-xl p-6 cursor-pointer hover:shadow-lg transition border border-gray-100">
+                        <p class="font-semibold text-gray-900 mb-2">LAX → JFK</p>
+                        <p class="text-2xl font-bold text-blue-600">$450</p>
+                        <p class="text-sm text-gray-600 mt-2">American Airlines</p>
+                        <p class="text-xs text-gray-500 mt-2">Click to load example</p>
+                    </div>
+                    <div onclick="loadExampleFlight('SFO', 'LAS', 120, 'Southwest Airlines')" class="bg-white rounded-xl p-6 cursor-pointer hover:shadow-lg transition border border-gray-100">
+                        <p class="font-semibold text-gray-900 mb-2">SFO → LAS</p>
+                        <p class="text-2xl font-bold text-blue-600">$120</p>
+                        <p class="text-sm text-gray-600 mt-2">Southwest Airlines</p>
+                        <p class="text-xs text-gray-500 mt-2">Click to load example</p>
+                    </div>
+                    <div onclick="loadExampleFlight('ORD', 'MIA', 280, 'United Airlines')" class="bg-white rounded-xl p-6 cursor-pointer hover:shadow-lg transition border border-gray-100">
+                        <p class="font-semibold text-gray-900 mb-2">ORD → MIA</p>
+                        <p class="text-2xl font-bold text-blue-600">$280</p>
+                        <p class="text-sm text-gray-600 mt-2">United Airlines</p>
+                        <p class="text-xs text-gray-500 mt-2">Click to load example</p>
+                    </div>
+                    <div onclick="loadExampleFlight('BOS', 'FLL', 210, 'JetBlue')" class="bg-white rounded-xl p-6 cursor-pointer hover:shadow-lg transition border border-gray-100">
+                        <p class="font-semibold text-gray-900 mb-2">BOS → FLL</p>
+                        <p class="text-2xl font-bold text-blue-600">$210</p>
+                        <p class="text-sm text-gray-600 mt-2">JetBlue</p>
+                        <p class="text-xs text-gray-500 mt-2">Click to load example</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCoA8BZOYmWYxgdgRnfKc1hjQUN63k4_eI",
+            authDomain: "fairclaim-9ec9c.firebaseapp.com",
+            databaseURL: "https://fairclaim-9ec9c-default-rtdb.firebaseio.com",
+            projectId: "fairclaim-9ec9c",
+            storageBucket: "fairclaim-9ec9c.firebasestorage.app",
+            messagingSenderId: "133094676711",
+            appId: "1:133094676711:web:9f2bdb3a429b6e0e0b2a42"
+        };
+
+        // Note: For REAL Firebase, replace the above with your actual Firebase credentials
+        // Instructions will be provided below
+
+        let currentUser = null;
+        let flights = [];
+        let isNewUser = false;
+        let auth = null;
+        let database = null;
+
+        // Initialize Firebase AFTER libraries load
+        function initFirebase() {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            auth = firebase.auth();
+            database = firebase.database();
+        }
+
+        // Email/Password Auth
+        function handleAuth(e) {
+            if (e) e.preventDefault();
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const errorEl = document.getElementById('authError');
+            const submitBtn = document.getElementById('authSubmitBtn');
+
+            // Clear previous errors
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            // Validation
+            if (!email || !password) {
+                showAuthError('Please fill in all fields');
+                return;
+            }
+            if (password.length < 6) {
+                showAuthError('Password must be at least 6 characters');
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showAuthError('Please enter a valid email address');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            document.getElementById('authSubmitText').textContent = '⏳ Loading...';
+
+            auth.createUserWithEmailAndPassword(email, password)
+                .then(userCredential => {
+                    // New user - created successfully
+                    currentUser = {
+                        email: userCredential.user.email,
+                        id: userCredential.user.uid,
+                        displayName: userCredential.user.displayName
+                    };
+                    isNewUser = true;
+                    localStorage.setItem('fairclaim_user', JSON.stringify(currentUser));
+                    console.log('✅ New user created: ' + currentUser.email);
+
+                    // Clear form
+                    document.getElementById('authEmail').value = '';
+                    document.getElementById('authPassword').value = '';
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                    document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+
+                    showSection('profile');
+                })
+                .catch(error => {
+                    if (error.code === 'auth/email-already-in-use') {
+                        // Existing user - attempt sign in
+                        auth.signInWithEmailAndPassword(email, password)
+                            .then(userCredential => {
+                                currentUser = {
+                                    email: userCredential.user.email,
+                                    id: userCredential.user.uid,
+                                    displayName: userCredential.user.displayName
+                                };
+                                localStorage.setItem('fairclaim_user', JSON.stringify(currentUser));
+                                console.log('✅ User signed in: ' + currentUser.email);
+
+                                database.ref('users/' + currentUser.id + '/profile').once('value', snapshot => {
+                                    // Clear form
+                                    document.getElementById('authEmail').value = '';
+                                    document.getElementById('authPassword').value = '';
+                                    submitBtn.disabled = false;
+                                    submitBtn.classList.remove('loading');
+                                    document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+
+                                    if (!snapshot.exists()) {
+                                        // Has account but no profile - show profile form
+                                        isNewUser = true;
+                                        showSection('profile');
+                                    } else {
+                                        // Has account and profile - show dashboard
+                                        isNewUser = false;
+                                        loadUserFlights();
+                                        showSection('dashboard');
+                                    }
+                                });
+                            })
+                            .catch(err => {
+                                submitBtn.disabled = false;
+                                submitBtn.classList.remove('loading');
+                                document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                                showAuthError('Invalid email or password');
+                                console.error('Sign in error:', err.message);
+                            });
+                    } else if (error.code === 'auth/weak-password') {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError('Password must be at least 6 characters');
+                    } else if (error.code === 'auth/invalid-email') {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError('Invalid email address');
+                    } else {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('authSubmitText').textContent = 'Sign In / Register';
+                        showAuthError(error.message);
+                        console.error('Auth error:', error);
+                    }
+                });
+        }
+
+        function showAuthError(message) {
+            const errorEl = document.getElementById('authError');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.style.display = 'block';
+            errorEl.parentElement.classList.add('error-shake');
+            setTimeout(() => errorEl.parentElement.classList.remove('error-shake'), 500);
+        }
+
+        // Google OAuth Auth
+        function handleGoogleAuth() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then(result => {
+                    currentUser = {
+                        email: result.user.email,
+                        id: result.user.uid,
+                        displayName: result.user.displayName
+                    };
+                    localStorage.setItem('fairclaim_user', JSON.stringify(currentUser));
+
+                    // Check if user profile exists
+                    database.ref('users/' + currentUser.id + '/profile').once('value', snapshot => {
+                        if (!snapshot.exists()) {
+                            // New user - show profile form
+                            isNewUser = true;
+                            if (currentUser.displayName) {
+                                document.getElementById('profileName').value = currentUser.displayName;
+                            }
+                            showSection('profile');
+                        } else {
+                            // Existing user
+                            isNewUser = false;
+                            loadUserFlights();
+                            showSection('dashboard');
+                        }
+                    });
+                })
+                .catch(error => alert('Google sign in failed: ' + error.message));
+        }
+
+        // Complete Profile Setup
+        function completeProfile() {
+            const name = document.getElementById('profileName').value;
+            const phone = document.getElementById('profilePhone').value;
+            const contact = document.getElementById('profileContact').value;
+
+            if (!name || !phone) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const profile = {
+                fullName: name,
+                phone: phone,
+                preferredContact: contact,
+                frequentFlyer: {
+                    'American Airlines': document.getElementById('ffAA').value || null,
+                    'United Airlines': document.getElementById('ffUA').value || null,
+                    'Delta Air Lines': document.getElementById('ffDL').value || null,
+                    'Southwest Airlines': document.getElementById('ffSW').value || null,
+                    'JetBlue': document.getElementById('ffJB').value || null
+                },
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to Firebase
+            database.ref('users/' + currentUser.id + '/profile').set(profile)
+                .then(() => {
+                    // Save to localStorage as backup
+                    localStorage.setItem('fairclaim_profile_' + currentUser.id, JSON.stringify(profile));
+                    loadUserFlights();
+                    showSection('dashboard');
+                })
+                .catch(error => alert('Error saving profile: ' + error.message));
+        }
+
+        function signOut() {
+            auth.signOut()
+                .then(() => {
+                    currentUser = null;
+                    localStorage.removeItem('fairclaim_user');
+                    flights = [];
+                    showSection('auth');
+                    document.getElementById('signinBtn').style.display = 'block';
+                    document.getElementById('signoutBtn').style.display = 'none';
+                })
+                .catch(error => alert('Sign out failed: ' + error.message));
+        }
+
+        function showSection(section) {
+            if (!currentUser && section !== 'auth') {
+                alert('Please sign in first');
+                showSection('auth');
+                return;
+            }
+
+            document.getElementById('authSection').style.display = section === 'auth' ? 'flex' : 'none';
+            document.getElementById('profileSection').style.display = section === 'profile' ? 'flex' : 'none';
+            document.getElementById('dashboardSection').style.display = section === 'dashboard' ? 'block' : 'none';
+            document.getElementById('trackSection').style.display = section === 'track' ? 'block' : 'none';
+
+            if (section === 'dashboard') {
+                updateDashboard();
+            }
+
+            if (currentUser) {
+                document.getElementById('signinBtn').style.display = 'none';
+                document.getElementById('signoutBtn').style.display = 'block';
+            }
+        }
+
+        function loadExampleFlight(from, to, price, airline) {
+            document.getElementById('fromAirport').value = from;
+            document.getElementById('toAirport').value = to;
+            document.getElementById('ticketPrice').value = price;
+            document.getElementById('airline').value = airline;
+
+            // Set departure date to 2 weeks from now
+            const date = new Date();
+            date.setDate(date.getDate() + 14);
+            document.getElementById('departDate').value = date.toISOString().split('T')[0];
+        }
+
+        function trackFlight(e) {
+            if (e) e.preventDefault();
+
+            const from = document.getElementById('fromAirport').value.toUpperCase().trim();
+            const to = document.getElementById('toAirport').value.toUpperCase().trim();
+            const price = parseFloat(document.getElementById('ticketPrice').value);
+            const airline = document.getElementById('airline').value;
+            const confirmNumber = (document.getElementById('confirmNumber').value || generateConfirmNumber()).toUpperCase();
+            const departDate = document.getElementById('departDate').value;
+            const errorEl = document.getElementById('trackError');
+            const submitBtn = document.getElementById('trackSubmitBtn');
+
+            // Clear previous errors
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            // Comprehensive Validation
+            if (!from || !to || !price || !departDate || !airline) {
+                showTrackError('Please fill in all required fields');
+                return;
+            }
+
+            if (from.length !== 3 || to.length !== 3) {
+                showTrackError('Airport codes must be 3 letters (e.g., LAX, JFK)');
+                return;
+            }
+
+            if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) {
+                showTrackError('Airport codes must contain only letters');
+                return;
+            }
+
+            if (from === to) {
+                showTrackError('Departure and arrival airports must be different');
+                return;
+            }
+
+            if (isNaN(price) || price <= 0) {
+                showTrackError('Price must be greater than $0');
+                return;
+            }
+
+            if (new Date(departDate) <= new Date()) {
+                showTrackError('Departure date must be in the future');
+                return;
+            }
+
+            if (!currentUser || !currentUser.id) {
+                showTrackError('Please sign in to track flights');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            document.getElementById('trackSubmitText').textContent = '⏳ Adding flight...';
+
+            const flight = {
+                id: Date.now(),
+                from,
+                to,
+                originalPrice: price,
+                currentPrice: price,
+                airline,
+                confirmNumber,
+                departDate,
+                startedTracking: new Date().toISOString(),
+                status: 'monitoring',
+                creditsEarned: 0,
+                pricesChecked: 0,
+                lowestPrice: price,
+                priceHistory: [{ date: new Date().toISOString(), price }]
+            };
+
+            flights.push(flight);
+
+            // Save to Firebase
+            if (currentUser && currentUser.id && database) {
+                database.ref('users/' + currentUser.id + '/flights/' + flight.id).set(flight)
+                    .then(() => {
+                        console.log('✅ Flight saved to Firebase:', flight.id);
+                        localStorage.setItem(`flight_${flight.id}`, JSON.stringify(flight));
+                        simulatePriceDrop(flight);
+                        showNotification('✅ Flight tracking started! Price updates coming soon...');
+
+                        // Clear form
+                        document.getElementById('trackForm').reset();
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+
+                        updateDashboard();
+                        showSection('dashboard');
+                    })
+                    .catch(error => {
+                        console.error('❌ Error saving to Firebase:', error);
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+                        showTrackError('Error: ' + error.message);
+                    });
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                document.getElementById('trackSubmitText').textContent = '🚀 Start Tracking Flight';
+                showTrackError('Unable to save flight. Please try again.');
+            }
+        }
+
+        function showTrackError(message) {
+            const errorEl = document.getElementById('trackError');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.style.display = 'block';
+            errorEl.parentElement.classList.add('error-shake');
+            setTimeout(() => errorEl.parentElement.classList.remove('error-shake'), 500);
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function simulatePriceDrop(flight) {
+            // Simulate checking price every few seconds
+            let checksRemaining = 5;
+            const checkInterval = setInterval(() => {
+                flight.pricesChecked++;
+
+                // 60% chance of price drop
+                if (Math.random() < 0.6) {
+                    const dropAmount = Math.floor(Math.random() * (flight.originalPrice * 0.15)) + 10;
+                    const newPrice = flight.currentPrice - dropAmount;
+
+                    if (newPrice < flight.lowestPrice) {
+                        flight.lowestPrice = newPrice;
+                        flight.creditsEarned = flight.originalPrice - newPrice;
+                        flight.priceHistory.push({
+                            date: new Date().toLocaleString(),
+                            price: newPrice,
+                            savings: flight.creditsEarned
+                        });
+
+                        // Trigger claim
+                        flight.status = 'claimed';
+                        showNotification(`💰 Price dropped! You saved $${flight.creditsEarned.toFixed(2)}`);
+                    }
+                }
+
+                flight.currentPrice = flight.lowestPrice;
+
+                // Save to Firebase
+                if (currentUser && currentUser.id) {
+                    database.ref('users/' + currentUser.id + '/flights/' + flight.id).set(flight)
+                        .catch(error => console.error('Error updating flight:', error));
+                }
+                localStorage.setItem(`flight_${flight.id}`, JSON.stringify(flight));
+                updateDashboard();
+
+                checksRemaining--;
+                if (checksRemaining === 0) clearInterval(checkInterval);
+            }, 3000);
+        }
+
+        function updateDashboard() {
+            let totalBookings = 0;
+            let totalCredits = 0;
+            let priceDrops = 0;
+            let activeTracking = 0;
+            let flightsHTML = '';
+
+            // Use the flights array that was already loaded from Firebase
+            // Do NOT reload from localStorage - use what was passed in
+            if (!flights || flights.length === 0) {
+                flightsHTML = '<div class="p-6 text-center text-gray-500">No flights tracked yet.</div>';
+            } else {
+                flights.forEach(flight => {
+                    totalBookings++;
+                    totalCredits += flight.creditsEarned;
+                    if (flight.creditsEarned > 0) priceDrops++;
+                    if (flight.status === 'monitoring') activeTracking++;
+
+                    const statusColor = flight.status === 'claimed' ? 'green' : 'blue';
+                    const statusText = flight.status === 'claimed' ? '✅ Claim Filed' : '🔍 Monitoring';
+
+                    flightsHTML += `
+                        <div class="p-6 hover:bg-gray-50 transition">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-bold text-gray-900">${flight.from} → ${flight.to}</h3>
+                                    <p class="text-sm text-gray-600">${flight.airline} • ${flight.departDate}</p>
+                                    <p class="text-xs text-gray-500 mt-1">Confirmation: <code class="bg-gray-100 px-2 py-1 rounded">${flight.confirmNumber}</code></p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-sm font-semibold text-gray-600 mb-1">Original Price</div>
+                                    <div class="text-2xl font-bold text-gray-900">$${flight.originalPrice.toFixed(2)}</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-4 mb-4">
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 mb-1">Current Price</p>
+                                    <p class="text-xl font-bold text-blue-600">$${flight.currentPrice.toFixed(2)}</p>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 mb-1">Credits Earned</p>
+                                    <p class="text-xl font-bold text-green-600">$${flight.creditsEarned.toFixed(2)}</p>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 mb-1">Status</p>
+                                    <p class="text-sm font-bold text-${statusColor}-600">${statusText}</p>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm">
+                                <p class="text-gray-600">Price checks: ${flight.pricesChecked}</p>
+                                <button onclick="viewFlightDetails(${flight.id})" class="text-blue-600 font-semibold hover:text-blue-700">View Details</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('totalBookings').textContent = totalBookings;
+            document.getElementById('totalCredits').textContent = '$' + totalCredits.toFixed(2);
+            document.getElementById('priceDrops').textContent = priceDrops;
+            document.getElementById('activeTracking').textContent = activeTracking;
+            document.getElementById('flightsList').innerHTML = flightsHTML;
+        }
+
+        function viewFlightDetails(flightId) {
+            const flight = flights.find(f => f.id === flightId);
+            if (!flight) return;
+
+            let historyHTML = flight.priceHistory.map(h => `
+                <div class="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
+                    <span class="text-sm text-gray-600">${h.date}</span>
+                    <span class="font-semibold text-gray-900">$${h.price.toFixed(2)}</span>
+                    ${h.savings ? `<span class="text-sm font-bold text-green-600">Saved $${h.savings.toFixed(2)}</span>` : ''}
+                </div>
+            `).join('');
+
+            alert(`Flight Details: ${flight.from} → ${flight.to}
+
+Original Price: $${flight.originalPrice.toFixed(2)}
+Current Price: $${flight.currentPrice.toFixed(2)}
+Credits Earned: $${flight.creditsEarned.toFixed(2)}
+Status: ${flight.status}
+Prices Checked: ${flight.pricesChecked}
+
+Lowest Price: $${flight.lowestPrice.toFixed(2)}
+Departure: ${flight.departDate}`);
+        }
+
+        function loadUserFlights() {
+            flights = [];
+            if (currentUser && currentUser.id) {
+                // Load from Firebase
+                database.ref('users/' + currentUser.id + '/flights').once('value', snapshot => {
+                    flights = [];
+                    if (snapshot.exists()) {
+                        const flightsData = snapshot.val();
+                        for (let key in flightsData) {
+                            flights.push(flightsData[key]);
+                        }
+                        console.log('Loaded ' + flights.length + ' flights from Firebase');
+                    } else {
+                        console.log('No flights found in Firebase');
+                    }
+                    updateDashboard();
+                });
+            } else {
+                // Fallback to localStorage for demo (user not logged in)
+                console.log('No current user, cannot load flights');
+                updateDashboard();
+            }
+        }
+
+        function generateConfirmNumber() {
+            return Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.className = 'fixed top-4 right-4 bg-white border-l-4 border-green-500 shadow-lg rounded px-6 py-4 text-gray-900 z-50 fade-in';
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 4000);
+        }
+
+        // Check if user is already logged in
+        window.addEventListener('load', () => {
+            initFirebase(); // Initialize Firebase first
+            const savedUser = localStorage.getItem('fairclaim_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                loadUserFlights();
+                showSection('dashboard');
+            } else {
+                showSection('auth');
+            }
+        });
+    </script>
+</body>
+</html>
